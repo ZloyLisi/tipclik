@@ -9,7 +9,9 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.kurs.MyOrdersActivity
 import com.example.kurs.R
+import com.example.kurs.ViewOrdersActivity
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {

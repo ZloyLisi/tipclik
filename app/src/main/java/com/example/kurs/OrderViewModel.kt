@@ -1,158 +1,184 @@
 package com.example.tipclik4
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.InputStream
 
-class OrderViewModel(private val app: Application, private val db: MainDB) : AndroidViewModel(app) {
-
-    private val _saveOrderResult = MutableLiveData<Result<Unit>>()
-    val saveOrderResult: LiveData<Result<Unit>> = _saveOrderResult
-
+class OrderViewModel(application: Application, private val db: MainDB) : AndroidViewModel(application) {
     private val _paperTypes = MutableLiveData<List<PaperType>>()
     val paperTypes: LiveData<List<PaperType>> = _paperTypes
-
     private val _printTypes = MutableLiveData<List<PrintType>>()
     val printTypes: LiveData<List<PrintType>> = _printTypes
-
     private val _orderTypes = MutableLiveData<List<OrderType>>()
     val orderTypes: LiveData<List<OrderType>> = _orderTypes
 
     private val _userOrders = MutableLiveData<Result<List<Order>>>()
     val userOrders: LiveData<Result<List<Order>>> = _userOrders
+
+    private val _saveOrderResult = MutableLiveData<Result<Unit>>()
+    val saveOrderResult: LiveData<Result<Unit>> = _saveOrderResult
+
+    private val _allOrders = MutableLiveData<Result<List<Order>>>()
+    val allOrders: LiveData<Result<List<Order>>> = _allOrders
+
     private val _viewOrdersResult = MutableLiveData<Result<List<Order>>>()
     val viewOrdersResult: LiveData<Result<List<Order>>> = _viewOrdersResult
 
 
     init {
-        loadPaperTypes()
-        loadPrintTypes()
-        loadOrderTypes()
+        viewModelScope.launch {
+            fetchPaperTypes()
+            fetchPrintTypes()
+            fetchOrderTypes()
+        }
     }
 
-    private fun loadPaperTypes() {
-        viewModelScope.launch {
-            val types = withContext(Dispatchers.IO) {
+    private suspend fun fetchPaperTypes() {
+        try {
+            val paperTypes = withContext(Dispatchers.IO) {
                 db.dao().getAllPaperTypes()
             }
-            _paperTypes.postValue(types)
+            _paperTypes.value = paperTypes
+        } catch (e: Exception) {
+            Log.d("OrderViewModel", "Ошибка загрузки типов бумаги ${e.message}")
         }
     }
 
-    private fun loadPrintTypes() {
-        viewModelScope.launch {
-            val types = withContext(Dispatchers.IO) {
+    private suspend fun fetchPrintTypes() {
+        try {
+            val printTypes = withContext(Dispatchers.IO) {
                 db.dao().getAllPrintTypes()
             }
-            _printTypes.postValue(types)
+            _printTypes.value = printTypes
+        } catch (e: Exception) {
+            Log.d("OrderViewModel", "Ошибка загрузки типов печати ${e.message}")
         }
     }
 
-    private fun loadOrderTypes() {
-        viewModelScope.launch {
-            val types = withContext(Dispatchers.IO) {
+    private suspend fun fetchOrderTypes() {
+        try {
+            val orderTypes = withContext(Dispatchers.IO) {
                 db.dao().getAllOrderTypes()
             }
-            _orderTypes.postValue(types)
-        }
-    }
-
-
-
-    fun saveOrder(userId: Long, paperType: String, printType: String, description: String, fileUri: Uri, quantity: Int, orderType: String) {
-        viewModelScope.launch {
-            try {
-                val paper = withContext(Dispatchers.IO) { db.dao().getPaperTypeByName(paperType) }
-                val print = withContext(Dispatchers.IO) { db.dao().getPrintTypeByName(printType) }
-                val order = withContext(Dispatchers.IO) { db.dao().getOrderTypeByName(orderType) }
-                var fileBytes: ByteArray? = null
-                var inputStream: InputStream? = null
-                try {
-                    inputStream = app.contentResolver.openInputStream(fileUri)
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    val resizedBitmap = bitmap?.let { resizeBitmap(it, 200) }
-                    fileBytes =  resizedBitmap?.let { bitmapToByteArray(it) }
-
-
-                } finally {
-                    inputStream?.close()
-                }
-
-
-                withContext(Dispatchers.IO) {
-                    val orderEntity = Order(
-                        idUser = userId.toInt(),
-                        idPaperType = paper?.id ?: 0,
-                        idPrintType = print?.id ?: 0,
-                        idOrderType = order?.id ?: 0,
-                        description = description,
-                        image = fileBytes,
-                        quantity = quantity
-                    )
-                    db.dao().insertOrder(orderEntity)
-                }
-                _saveOrderResult.postValue(Result.success(Unit))
-            } catch (e: Exception) {
-                _saveOrderResult.postValue(Result.failure(e))
-            }
+            _orderTypes.value = orderTypes
+        } catch (e: Exception) {
+            Log.d("OrderViewModel", "Ошибка загрузки типов заказа ${e.message}")
         }
     }
 
 
     suspend fun fetchUserOrders(userId: Long) {
-        try {
-            val orders = withContext(Dispatchers.IO) {
-                db.dao().getOrdersByUserId(userId)
+        viewModelScope.launch {
+            try {
+                val orders = withContext(Dispatchers.IO) {
+                    db.dao().getOrdersByUserId(userId)
+                }
+                _userOrders.value = Result.success(orders)
+            } catch (e: Exception) {
+                _userOrders.value = Result.failure(e)
+                Log.d("OrderViewModel", "Ошибка загрузки заказов ${e.message}")
             }
-            _userOrders.postValue(Result.success(orders))
-        } catch (e: Exception) {
-            _userOrders.postValue(Result.failure(e))
         }
     }
 
-    suspend fun viewOrdersByEmail(email: String) {
-        try {
-            val orders = withContext(Dispatchers.IO) {
-                val user = db.dao().getUserByEmail(email)
-                if (user != null) {
-                    db.dao().getOrdersByUserId(user.id.toLong())
-                } else {
-                    emptyList()
+    suspend fun fetchAllOrders() {
+        viewModelScope.launch {
+            try {
+                val orders = withContext(Dispatchers.IO) {
+                    db.dao().getAllOrders()
                 }
+                _allOrders.value = Result.success(orders)
+            } catch (e: Exception) {
+                _allOrders.value = Result.failure(e)
+                Log.d("OrderViewModel", "Ошибка загрузки всех заказов ${e.message}")
             }
-            _viewOrdersResult.postValue(Result.success(orders))
-        } catch (e: Exception) {
-            _viewOrdersResult.postValue(Result.failure(e))
         }
     }
-    private fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
-        var width = bitmap.width
-        var height = bitmap.height
-        val bitmapRatio = width.toFloat() / height.toFloat()
-        if (bitmapRatio > 1) {
-            width = maxSize
-            height = (maxSize / bitmapRatio).toInt()
-        } else {
-            height = maxSize
-            width = (maxSize * bitmapRatio).toInt()
+
+
+    suspend fun saveOrder(
+        userId: Long,
+        paperType: String,
+        printType: String,
+        description: String,
+        imageUri: Uri,
+        quantity: Int,
+        orderType: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val paperTypeEntity = db.dao().getPaperTypeByName(paperType)
+                val printTypeEntity = db.dao().getPrintTypeByName(printType)
+                val orderTypeEntity = db.dao().getOrderTypeByName(orderType)
+                if (paperTypeEntity == null || printTypeEntity == null || orderTypeEntity == null) {
+                    _saveOrderResult.value = Result.failure(Exception("Не найден тип бумаги/печати/заказа"))
+                    return@launch
+                }
+                val inputStream: InputStream? =
+                    getApplication<Application>().contentResolver.openInputStream(imageUri)
+                val byteArray = inputStream?.use { it.readBytes() }
+                val order = Order(
+                    idUser = userId.toInt(),
+                    idPaperType = paperTypeEntity.id,
+                    idPrintType = printTypeEntity.id,
+                    idOrderType = orderTypeEntity.id,
+                    description = description,
+                    image = byteArray,
+                    quantity = quantity
+                )
+                withContext(Dispatchers.IO) {
+                    val existingOrder = order.id?.let { db.dao().getOrderById(it) }
+                    if (existingOrder != null) {
+                        db.dao().updateOrder(order)
+                    } else {
+                        db.dao().insertOrder(order)
+                    }
+
+                }
+                _saveOrderResult.value = Result.success(Unit)
+
+            } catch (e: Exception) {
+                _saveOrderResult.value = Result.failure(e)
+                Log.d("OrderViewModel", "Ошибка сохранения заказа ${e.message}")
+            }
         }
-        return Bitmap.createScaledBitmap(bitmap, width, height, true)
     }
-    private fun bitmapToByteArray(bitmap: Bitmap) : ByteArray? {
-        val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-        return outputStream.toByteArray()
+    suspend fun viewOrdersByEmail(email: String) {
+        viewModelScope.launch {
+            try {
+                val orders = withContext(Dispatchers.IO) {
+                    val user = db.dao().getUserByEmail(email)
+                    if (user != null) {
+                        db.dao().getOrdersByUserId(user.id.toLong())
+                    } else {
+                        emptyList()
+                    }
+                }
+                _viewOrdersResult.postValue(Result.success(orders))
+            } catch (e: Exception) {
+                _viewOrdersResult.postValue(Result.failure(e))
+            }
+        }
+    }
+
+    class OrderViewModelFactory(private val application: Application, private val db: MainDB) :
+        ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(OrderViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return OrderViewModel(application, db) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
     }
 }
-
-

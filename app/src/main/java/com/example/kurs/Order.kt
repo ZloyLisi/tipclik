@@ -11,7 +11,7 @@ data class Order(
     val idPaperType: Int,
     val idPrintType: Int,
     val idOrderType: Int,
-    val description: String?,
-    val image: ByteArray?,
+    val description: String? = null,
+    val image: ByteArray? = null,
     val quantity: Int
 )

@@ -13,10 +13,17 @@
         android:theme="@style/Theme.Kurs"
         tools:targetApi="31">
         <activity
-            android:name="com.example.tipclik4.ViewOrdersActivity"
+            android:name="com.example.tipclik4.ManagerEditOrderActivity"
+            android:exported="false" />
+
+        <activity
+            android:name="com.example.tipclik4.EditOrderActivity"
             android:exported="false" />
         <activity
-            android:name="com.example.tipclik4.MyOrdersActivity"
+            android:name=".ViewOrdersActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MyOrdersActivity"
             android:exported="false" />
         <activity
             android:name="com.example.tipclik4.PrintDesignActivity"
@@ -33,16 +40,15 @@
         <activity
             android:name="com.example.tipclik4.LoginActivity"
             android:exported="true">
-        <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
 
-        <category android:name="android.intent.category.LAUNCHER" />
-    </intent-filter>
-    </activity>
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name="com.example.tipclik4.MainActivity"
-            android:exported="true"/>
-
+            android:exported="true" />
     </application>
 
 </manifest>
